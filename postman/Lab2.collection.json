@@ -1,0 +1,227 @@
+{
+  "info": {
+    "name": "Lab 2 — Expense Tracker API (fixed URLs)",
+    "_postman_id": "",
+    "description": "Fixed: request.url is a string so Postman shows paths. Uses {{baseUrl}}, {{userId}}, {{categoryId}}, {{recordId}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /healthcheck",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/healthcheck"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "POST /user (create) -> sets {{userId}}",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "if (data && data.id) { pm.environment.set('userId', data.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\"\n}"
+            },
+            "url": "{{baseUrl}}/user"
+          }
+        },
+        {
+          "name": "GET /users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/users"
+          }
+        },
+        {
+          "name": "GET /user/:user_id (uses {{userId}})",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/user/{{userId}}"
+          }
+        },
+        {
+          "name": "DELETE /user/:user_id (uses {{userId}})",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/user/{{userId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "POST /category (create) -> sets {{categoryId}}",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "if (data && data.id) { pm.environment.set('categoryId', data.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Category\"\n}"
+            },
+            "url": "{{baseUrl}}/category"
+          }
+        },
+        {
+          "name": "GET /category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/category"
+          }
+        },
+        {
+          "name": "DELETE /category?category_id={{categoryId}}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/category?category_id={{categoryId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Records",
+      "item": [
+        {
+          "name": "POST /record (create) -> sets {{recordId}}",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "if (data && data.id) { pm.environment.set('recordId', data.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"category_id\": \"{{categoryId}}\",\n  \"amount\": 123\n}"
+            },
+            "url": "{{baseUrl}}/record"
+          }
+        },
+        {
+          "name": "GET /record/:record_id (uses {{recordId}})",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/record/{{recordId}}"
+          }
+        },
+        {
+          "name": "GET /record?user_id={{userId}}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/record?user_id={{userId}}"
+          }
+        },
+        {
+          "name": "GET /record?category_id={{categoryId}}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/record?category_id={{categoryId}}"
+          }
+        },
+        {
+          "name": "GET /record?user_id={{userId}}&category_id={{categoryId}}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/record?user_id={{userId}}&category_id={{categoryId}}"
+          }
+        },
+        {
+          "name": "GET /record (no params) -> should be 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/record"
+          }
+        },
+        {
+          "name": "DELETE /record/:record_id (uses {{recordId}})",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/record/{{recordId}}"
+          }
+        }
+      ]
+    }
+  ]
+}
