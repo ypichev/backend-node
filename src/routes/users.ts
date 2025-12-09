@@ -1,28 +1,58 @@
 import { Router } from "express";
-import { createUser, deleteUser, getUser, listUsers } from "../storage";
+import { prisma } from "../db/prisma";
+import { HttpError } from "../errors/httpError";
+import { asyncHandler } from "../middleware/asyncHandler";
+import { validateBody } from "../middleware/validate";
+import { CreateUserSchema } from "../validation/schemas";
 
 export const usersRouter = Router();
 
-usersRouter.get("/user/:user_id", (req, res) => {
-  const user = getUser(req.params.user_id);
-  if (!user) return res.status(404).json({ message: "User not found" });
-  return res.json(user);
-});
+usersRouter.post(
+  "/user",
+  validateBody(CreateUserSchema),
+  asyncHandler(async (req, res) => {
+    const { name } = req.body as { name: string };
 
-usersRouter.delete("/user/:user_id", (req, res) => {
-  const ok = deleteUser(req.params.user_id);
-  if (!ok) return res.status(404).json({ message: "User not found" });
-  return res.json({ message: "User deleted" });
-});
+    const user = await prisma.$transaction(async (tx: any) => {
+      const created = await tx.user.create({ data: { name } });
+      await tx.account.create({ data: { userId: created.id, balance: 0 } });
+      return created;
+    });
 
-usersRouter.post("/user", (req, res) => {
-  const name = String(req.body?.name ?? "").trim();
-  if (!name) return res.status(400).json({ message: "name is required" });
+    return res.status(201).json({ id: user.id, name: user.name });
+  })
+);
 
-  const user = createUser(name);
-  return res.status(201).json(user);
-});
+usersRouter.get(
+  "/users",
+  asyncHandler(async (_req, res) => {
+    const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
+    return res.json(users.map((u: any) => ({ id: u.id, name: u.name })));
+  })
+);
 
-usersRouter.get("/users", (_req, res) => {
-  return res.json(listUsers());
-});
+usersRouter.get(
+  "/user/:user_id",
+  asyncHandler(async (req, res) => {
+    const userId = req.params.user_id;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new HttpError(404, "User not found");
+
+    return res.json({ id: user.id, name: user.name });
+  })
+);
+
+usersRouter.delete(
+  "/user/:user_id",
+  asyncHandler(async (req, res) => {
+    const userId = req.params.user_id;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new HttpError(404, "User not found");
+
+    await prisma.user.delete({ where: { id: userId } });
+
+    return res.json({ message: "User deleted" });
+  })
+);

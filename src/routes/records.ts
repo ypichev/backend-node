@@ -1,50 +1,127 @@
 import { Router } from "express";
-import { createRecord, deleteRecord, getCategory, getRecord, getUser, listRecordsFiltered } from "../storage";
+import { prisma } from "../db/prisma";
+import { HttpError } from "../errors/httpError";
+import { asyncHandler } from "../middleware/asyncHandler";
+import { validateBody, validateQuery } from "../middleware/validate";
+import {
+  CreateRecordSchema,
+  RecordFilterQuerySchema,
+} from "../validation/schemas";
 
 export const recordsRouter = Router();
 
-recordsRouter.get("/record/:record_id", (req, res) => {
-  const rec = getRecord(req.params.record_id);
-  if (!rec) return res.status(404).json({ message: "Record not found" });
-  return res.json(rec);
-});
+recordsRouter.get(
+  "/record/:record_id",
+  asyncHandler(async (req, res) => {
+    const recordId = req.params.record_id;
 
-recordsRouter.delete("/record/:record_id", (req, res) => {
-  const ok = deleteRecord(req.params.record_id);
-  if (!ok) return res.status(404).json({ message: "Record not found" });
-  return res.json({ message: "Record deleted" });
-});
+    const rec = await prisma.record.findUnique({ where: { id: recordId } });
+    if (!rec) throw new HttpError(404, "Record not found");
 
-recordsRouter.post("/record", (req, res) => {
-  const userId = String(req.body?.user_id ?? "").trim();
-  const categoryId = String(req.body?.category_id ?? "").trim();
-  const amountRaw = req.body?.amount;
+    return res.json({
+      id: rec.id,
+      userId: rec.userId,
+      categoryId: rec.categoryId,
+      createdAt: rec.createdAt.toISOString(),
+      amount: rec.amount,
+    });
+  })
+);
 
-  const amount = typeof amountRaw === "number" ? amountRaw : Number(amountRaw);
+recordsRouter.delete(
+  "/record/:record_id",
+  asyncHandler(async (req, res) => {
+    const recordId = req.params.record_id;
 
-  if (!userId) return res.status(400).json({ message: "user_id is required" });
-  if (!categoryId) return res.status(400).json({ message: "category_id is required" });
-  if (!Number.isFinite(amount)) return res.status(400).json({ message: "amount must be a number" });
+    const rec = await prisma.record.findUnique({ where: { id: recordId } });
+    if (!rec) throw new HttpError(404, "Record not found");
 
-  if (!getUser(userId)) return res.status(404).json({ message: "User not found" });
-  if (!getCategory(categoryId)) return res.status(404).json({ message: "Category not found" });
+    await prisma.record.delete({ where: { id: recordId } });
 
-  const rec = createRecord(userId, categoryId, amount);
-  return res.status(201).json(rec);
-});
+    return res.json({ message: "Record deleted" });
+  })
+);
 
-recordsRouter.get("/record", (req, res) => {
-  const userId = typeof req.query.user_id === "string" ? req.query.user_id.trim() : "";
-  const categoryId = typeof req.query.category_id === "string" ? req.query.category_id.trim() : "";
+recordsRouter.post(
+  "/record",
+  validateBody(CreateRecordSchema),
+  asyncHandler(async (req, res) => {
+    const { user_id, category_id, amount } = req.body as {
+      user_id: string;
+      category_id: string;
+      amount: number;
+    };
 
-  if (!userId && !categoryId) {
-    return res.status(400).json({ message: "user_id and/or category_id query params are required" });
-  }
+    const result = await prisma.$transaction(async (tx: any) => {
+      const user = await tx.user.findUnique({ where: { id: user_id } });
+      if (!user) throw new HttpError(404, "User not found");
 
-  const items = listRecordsFiltered({
-    userId: userId || undefined,
-    categoryId: categoryId || undefined,
-  });
+      const category = await tx.category.findUnique({
+        where: { id: category_id },
+      });
+      if (!category) throw new HttpError(404, "Category not found");
 
-  return res.json(items);
-});
+      const account = await tx.account.findUnique({ where: { userId: user_id } });
+      if (!account) throw new HttpError(404, "Account not found");
+
+      if (account.balance < amount) {
+        throw new HttpError(400, "Insufficient funds", {
+          balance: account.balance,
+          required: amount,
+        });
+      }
+
+      const newBalance = account.balance - amount;
+
+      await tx.account.update({
+        where: { id: account.id },
+        data: { balance: newBalance },
+      });
+
+      const rec = await tx.record.create({
+        data: { userId: user_id, categoryId: category_id, amount },
+      });
+
+      return { rec, newBalance };
+    });
+
+    return res.status(201).json({
+      id: result.rec.id,
+      userId: result.rec.userId,
+      categoryId: result.rec.categoryId,
+      createdAt: result.rec.createdAt.toISOString(),
+      amount: result.rec.amount,
+      accountBalance: result.newBalance,
+    });
+  })
+);
+
+recordsRouter.get(
+  "/record",
+  validateQuery(RecordFilterQuerySchema),
+  asyncHandler(async (req, res) => {
+    const { user_id, category_id } = req.query as {
+      user_id?: string;
+      category_id?: string;
+    };
+
+    const where: any = {};
+    if (user_id) where.userId = user_id;
+    if (category_id) where.categoryId = category_id;
+
+    const items = await prisma.record.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.json(
+      items.map((r: any) => ({
+        id: r.id,
+        userId: r.userId,
+        categoryId: r.categoryId,
+        createdAt: r.createdAt.toISOString(),
+        amount: r.amount,
+      }))
+    );
+  })
+);
