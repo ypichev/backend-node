@@ -1,32 +1,51 @@
 import { Router } from "express";
-import { createCategory, deleteCategory, listCategories } from "../storage";
+import { prisma } from "../db/prisma";
+import { HttpError } from "../errors/httpError";
+import { asyncHandler } from "../middleware/asyncHandler";
+import { validateBody, validateQuery } from "../middleware/validate";
+import {
+  CategoryDeleteQuerySchema,
+  CreateCategorySchema,
+} from "../validation/schemas";
 
 export const categoriesRouter = Router();
 
-categoriesRouter.get("/category", (_req, res) => {
-  return res.json(listCategories());
-});
+categoriesRouter.get(
+  "/category",
+  asyncHandler(async (_req, res) => {
+    const categories = await prisma.category.findMany({
+      orderBy: { createdAt: "desc" },
+    });
 
-categoriesRouter.post("/category", (req, res) => {
-  const name = String(req.body?.name ?? "").trim();
-  if (!name) return res.status(400).json({ message: "name is required" });
+    return res.json(categories.map((c: any) => ({ id: c.id, name: c.name })));
+  })
+);
 
-  const category = createCategory(name);
-  return res.status(201).json(category);
-});
+categoriesRouter.post(
+  "/category",
+  validateBody(CreateCategorySchema),
+  asyncHandler(async (req, res) => {
+    const { name } = req.body as { name: string };
 
-categoriesRouter.delete("/category", (req, res) => {
-  const idFromQuery = typeof req.query?.category_id === "string" ? req.query.category_id : undefined;
-  const idFromBody = typeof req.body?.category_id === "string" ? req.body.category_id : undefined;
-  const idFromBodyAlt = typeof req.body?.id === "string" ? req.body.id : undefined;
+    const category = await prisma.category.create({ data: { name } });
 
-  const categoryId = (idFromQuery ?? idFromBody ?? idFromBodyAlt ?? "").trim();
-  if (!categoryId) {
-    return res.status(400).json({ message: "category_id is required (query or body)" });
-  }
+    return res.status(201).json({ id: category.id, name: category.name });
+  })
+);
 
-  const ok = deleteCategory(categoryId);
-  if (!ok) return res.status(404).json({ message: "Category not found" });
+categoriesRouter.delete(
+  "/category",
+  validateQuery(CategoryDeleteQuerySchema),
+  asyncHandler(async (req, res) => {
+    const { category_id } = req.query as { category_id: string };
 
-  return res.json({ message: "Category deleted" });
-});
+    const existing = await prisma.category.findUnique({
+      where: { id: category_id },
+    });
+    if (!existing) throw new HttpError(404, "Category not found");
+
+    await prisma.category.delete({ where: { id: category_id } });
+
+    return res.json({ message: "Category deleted" });
+  })
+);
