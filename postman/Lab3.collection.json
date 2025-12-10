@@ -1,0 +1,267 @@
+{
+  "info": {
+    "name": "Lab 3 — Expense Tracker API (DB + Prisma + Validation + Accounts)",
+    "_postman_id": "",
+    "description": "Lab 3: PostgreSQL + Prisma + Zod validation + error handling. Variant group 36: Account income/topup and auto charge on expense.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /healthcheck",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/healthcheck"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Flow (recommended order)",
+      "item": [
+        {
+          "name": "1) POST /user (create) -> sets {{userId}}",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "if (data?.id) pm.environment.set('userId', data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\"\n}"
+            },
+            "url": "{{baseUrl}}/user"
+          }
+        },
+        {
+          "name": "2) GET /account/:user_id (uses {{userId}}) -> sets {{balance}}",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const data = pm.response.json();",
+                  "if (data?.balance !== undefined) pm.environment.set('balance', data.balance);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/account/{{userId}}"
+          }
+        },
+        {
+          "name": "3) POST /account/topup -> sets {{balance}}",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const data = pm.response.json();",
+                  "if (data?.balance !== undefined) pm.environment.set('balance', data.balance);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"amount\": 1000\n}"
+            },
+            "url": "{{baseUrl}}/account/topup"
+          }
+        },
+        {
+          "name": "4) POST /category (create) -> sets {{categoryId}}",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "if (data?.id) pm.environment.set('categoryId', data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Food\"\n}"
+            },
+            "url": "{{baseUrl}}/category"
+          }
+        },
+        {
+          "name": "5) POST /record (expense) -> sets {{recordId}} and updates {{balance}}",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "if (data?.id) pm.environment.set('recordId', data.id);",
+                  "if (data?.accountBalance !== undefined) pm.environment.set('balance', data.accountBalance);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"category_id\": \"{{categoryId}}\",\n  \"amount\": 250\n}"
+            },
+            "url": "{{baseUrl}}/record"
+          }
+        },
+        {
+          "name": "6) GET /record/:record_id (uses {{recordId}})",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/record/{{recordId}}"
+          }
+        },
+        {
+          "name": "7) GET /record?user_id={{userId}}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/record?user_id={{userId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Negative tests",
+      "item": [
+        {
+          "name": "GET /record (no params) -> should be 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/record"
+          }
+        },
+        {
+          "name": "POST /record (insufficient funds) -> should be 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"category_id\": \"{{categoryId}}\",\n  \"amount\": 999999\n}"
+            },
+            "url": "{{baseUrl}}/record"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cleanup (optional)",
+      "item": [
+        {
+          "name": "DELETE /record/:record_id (uses {{recordId}})",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/record/{{recordId}}"
+          }
+        },
+        {
+          "name": "DELETE /category?category_id={{categoryId}}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/category?category_id={{categoryId}}"
+          }
+        },
+        {
+          "name": "DELETE /user/:user_id (uses {{userId}})",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/user/{{userId}}"
+          }
+        }
+      ]
+    }
+  ]
+}

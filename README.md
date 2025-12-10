@@ -1,22 +1,69 @@
-# REST API (Node.js + Express + TypeScript)
+# Лабораторна робота №3 — Валідація, обробка помилок, ORM та БД
+**Стек:** Node.js + Express + TypeScript + PostgreSQL + Prisma
 
-This lab implements a simple Expense Tracker REST API **without a database** (in-memory storage).
+У цій лабораторній роботі реалізовано REST API (Expense Tracker) з:
+- PostgreSQL (через `docker compose`)
+- Prisma ORM + міграції
+- Валідація вхідних даних (Zod)
+- Централізований `errorHandler`
+- **Додаткове завдання (група 36): “Облік доходів”** — рахунок (Account), поповнення балансу та автоматичне списання при створенні витрати
 
-## Requirements
-- Implement the required REST endpoints (Users, Categories, Records)
-- `GET /record` must support filtering by `user_id` and/or `category_id`
-- If `GET /record` is called **without** query parameters, the API must return **400**
-- Provide Postman **Collection** and **2 Environments** (local + prod)
-- Provide a Postman Flow screenshot in `assets/lab2.png`
+---
 
-## Run locally
+## Варіант (група 36)
+Група: **36** → `36 % 3 = 0` → **“Облік доходів”**.
+
+Реалізація:
+- Кожен користувач має `Account(balance)`
+- `POST /account/topup` — поповнення балансу (дохід)
+- `POST /record` — створення витрати та **автоматичне списання** з балансу
+- Від’ємний баланс **заборонений**: якщо коштів недостатньо → **400 Insufficient funds**
+
+---
+
+## Вимоги до оточення
+- Node.js
+- Docker + Docker Compose
+
+---
+
+## Налаштування
 ```bash
 npm install
 cp .env.example .env
+```
+
+### Приклад `.env`
+```env
+PORT=8080
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app?schema=public"
+```
+
+---
+
+## Запуск бази даних
+```bash
+docker compose up -d db
+```
+
+---
+
+## Prisma (версія 6.19.1)
+```bash
+npx prisma generate
+npx prisma migrate dev --name init
+```
+
+---
+
+## Запуск API
+```bash
 npm run dev
 ```
 
-Service default: `http://localhost:8080`
+База URL за замовчуванням: `http://localhost:8080`
+
+---
 
 ## Endpoints
 
@@ -24,39 +71,46 @@ Service default: `http://localhost:8080`
 - `GET /healthcheck`
 
 ### Users
-- `GET /user/:user_id`
-- `DELETE /user/:user_id`
-- `POST /user`
-  - body: `{ "name": "Alice" }`
-- `GET /users`
+- `POST /user` — створити користувача (автоматично створює `Account`)
+- `GET /users` — список користувачів
+- `GET /user/:user_id` — отримати користувача
+- `DELETE /user/:user_id` — видалити користувача
 
 ### Categories
-- `GET /category`
-- `POST /category`
-  - body: `{ "name": "Food" }`
-- `DELETE /category`
-  - used in this project as: `DELETE /category?category_id=<id>`
+- `POST /category` — створити категорію
+- `GET /category` — список категорій
+- `DELETE /category?category_id=<uuid>` — видалити категорію (сумісно з ЛР2)
 
-### Records
-- `GET /record/:record_id`
-- `DELETE /record/:record_id`
-- `POST /record`
-  - body: `{ "user_id": "u1", "category_id": "c1", "amount": 123 }`
-- `GET /record?user_id=<id>&category_id=<id>`
-  - at least one of `user_id` or `category_id` is required
+### Records (витрати)
+- `POST /record` — створити витрату (списує кошти з Account)
+- `GET /record/:record_id` — отримати запис
+- `DELETE /record/:record_id` — видалити запис
+- `GET /record?user_id=<uuid>&category_id=<uuid>`
+  - потрібно передати **хоча б один** параметр: `user_id` або `category_id`
+  - якщо викликати `GET /record` без параметрів → **400**
+
+### Account (додаткове завдання)
+- `GET /account/:user_id` — поточний баланс
+- `POST /account/topup` — поповнення
+  - body: `{ "user_id": "<uuid>", "amount": 100 }`
+
+---
 
 ## Postman
-Import:
-- `postman/Lab2.collection.json`
-- `postman/Lab2.local.environment.json`
-- `postman/Lab2.prod.environment.json`
+Імпорт:
+- `postman/Lab3.collection.json`
+- `postman/Lab3.local.environment.json`
+- `postman/Lab3.prod.environment.json`
 
-### Variables used in requests
-- `{{baseUrl}}` — API base URL
-- `{{userId}}` — created user id
-- `{{categoryId}}` — created category id
-- `{{recordId}}` — created record id
+Використані змінні:
+- `{{baseUrl}}`
+- `{{userId}}`
+- `{{categoryId}}`
+- `{{recordId}}`
 
-## Postman Flow screenshot
+---
+
+## Скріншот Postman Flow
+Додай скріншот сюди:
 
 ![Postman Flow](assets/lab2.png)
