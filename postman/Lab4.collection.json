@@ -1,0 +1,321 @@
+{
+  "info": {
+    "name": "Lab 4 — Auth (JWT) + Protected API (Node.js + Express + TS)",
+    "_postman_id": "",
+    "description": "Lab 4: Register/Login with JWT. All endpoints except /healthcheck and /auth/* are protected by Bearer token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "GET /healthcheck",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/healthcheck",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "POST /auth/register (sets {{userId}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 409', function () { pm.expect([201,409]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  if (data?.id) pm.environment.set('userId', data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "POST /auth/login (sets {{accessToken}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const data = pm.response.json();",
+                  "pm.test('access_token exists', function () { pm.expect(data).to.have.property('access_token'); });",
+                  "pm.environment.set('accessToken', data.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Protected (requires Bearer {{accessToken}})",
+      "item": [
+        {
+          "name": "GET /users",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users"
+          }
+        },
+        {
+          "name": "GET /user/{{userId}}",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/user/{{userId}}"
+          }
+        },
+        {
+          "name": "POST /category (sets {{categoryId}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "if (data?.id) pm.environment.set('categoryId', data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Food\"\n}"
+            },
+            "url": "{{baseUrl}}/category"
+          }
+        },
+        {
+          "name": "GET /category",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/category"
+          }
+        },
+        {
+          "name": "POST /account/topup (sets {{balance}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const data = pm.response.json();",
+                  "if (data?.balance !== undefined) pm.environment.set('balance', data.balance);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"amount\": 1000\n}"
+            },
+            "url": "{{baseUrl}}/account/topup"
+          }
+        },
+        {
+          "name": "GET /account/{{userId}}",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/account/{{userId}}"
+          }
+        },
+        {
+          "name": "POST /record (expense) (sets {{recordId}} and {{balance}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "if (data?.id) pm.environment.set('recordId', data.id);",
+                  "if (data?.accountBalance !== undefined) pm.environment.set('balance', data.accountBalance);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"category_id\": \"{{categoryId}}\",\n  \"amount\": 250\n}"
+            },
+            "url": "{{baseUrl}}/record"
+          }
+        },
+        {
+          "name": "GET /record/{{recordId}}",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/record/{{recordId}}"
+          }
+        },
+        {
+          "name": "GET /record?user_id={{userId}}",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/record?user_id={{userId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth negative tests",
+      "item": [
+        {
+          "name": "GET /users without token -> 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/users"
+          }
+        },
+        {
+          "name": "GET /users with invalid token -> 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer invalid.token.here"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/users"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cleanup (optional)",
+      "item": [
+        {
+          "name": "DELETE /record/{{recordId}}",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/record/{{recordId}}"
+          }
+        },
+        {
+          "name": "DELETE /category?category_id={{categoryId}}",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/category?category_id={{categoryId}}"
+          }
+        },
+        {
+          "name": "DELETE /user/{{userId}}",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/user/{{userId}}"
+          }
+        }
+      ]
+    }
+  ]
+}

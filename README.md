@@ -1,116 +1,228 @@
-# Лабораторна робота №3 — Валідація, обробка помилок, ORM та БД
-**Стек:** Node.js + Express + TypeScript + PostgreSQL + Prisma
+# karlyk-node-backend — Expense Tracker API
+**Tech stack:** Node.js, Express, TypeScript, PostgreSQL, Prisma, Zod, JWT
 
-У цій лабораторній роботі реалізовано REST API (Expense Tracker) з:
-- PostgreSQL (через `docker compose`)
+Проєкт реалізує REST API для обліку витрат (категорії + записи витрат) та додаткову логіку “облік доходів” через рахунок користувача (Account).  
+Починаючи з ЛР4, API захищений JWT-токеном: усі ендпоінти, окрім `healthcheck` та `auth/*`, потребують `Authorization: Bearer <token>`.
+
+---
+
+## Лабораторні роботи
+
+### ЛР1 — Node.js + Express + TypeScript (базовий сервіс)
+- Створена структура проєкту
+- Підключено TypeScript
+- Базовий запуск сервера та роутинг
+
+### ЛР2 — CRUD для Users / Categories / Records + Postman
+- Реалізовані ендпоінти:
+  - користувачі
+  - категорії
+  - записи витрат
+- Підготовлені Postman environment (local/prod) та collection
+- Додано flow-скріншот Postman
+
+### ЛР3 — БД та ORM (PostgreSQL + Prisma), валідація, обробка помилок
+- PostgreSQL у Docker Compose
 - Prisma ORM + міграції
-- Валідація вхідних даних (Zod)
-- Централізований `errorHandler`
-- **Додаткове завдання (група 36): “Облік доходів”** — рахунок (Account), поповнення балансу та автоматичне списання при створенні витрати
+- Zod-валидація (body/query)
+- Централізований error handler
+- **Додаткове завдання (група 36): “Облік доходів”**
+  - `Account(balance)` для користувача
+  - `POST /account/topup` — поповнення балансу
+  - `POST /record` — створення витрати + автоматичне списання з балансу
+  - Заборонено від’ємний баланс (помилка при нестачі коштів)
+
+### ЛР4 — Авторизація (JWT) та захист API
+- `POST /auth/register`
+- `POST /auth/login` → повертає `access_token`
+- Усі ендпоінти (окрім `GET /healthcheck` та `/auth/*`) захищені middleware `requireAuth`
 
 ---
 
-## Варіант (група 36)
-Група: **36** → `36 % 3 = 0` → **“Облік доходів”**.
-
-Реалізація:
-- Кожен користувач має `Account(balance)`
-- `POST /account/topup` — поповнення балансу (дохід)
-- `POST /record` — створення витрати та **автоматичне списання** з балансу
-- Від’ємний баланс **заборонений**: якщо коштів недостатньо → **400 Insufficient funds**
-
----
-
-## Вимоги до оточення
-- Node.js
+## Вимоги
+- Node.js (рекомендовано LTS)
 - Docker + Docker Compose
+- Postman (для перевірки)
 
 ---
 
-## Налаштування
+## Налаштування та запуск
+
+### 1) Встановити залежності
 ```bash
 npm install
+```
+
+### 2) Налаштувати `.env`
+```bash
 cp .env.example .env
 ```
 
-### Приклад `.env`
+Приклад `.env`:
 ```env
 PORT=8080
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app?schema=public"
+
+JWT_SECRET_KEY=super_secret_change_me
+JWT_EXPIRES_IN=7d
 ```
 
----
-
-## Запуск бази даних
+### 3) Запустити PostgreSQL
 ```bash
 docker compose up -d db
 ```
 
----
-
-## Prisma (версія 6.19.1)
+### 4) Prisma (версія 6.19.1)
 ```bash
 npx prisma generate
-npx prisma migrate dev --name init
+npx prisma migrate dev
 ```
 
----
-
-## Запуск API
+### 5) Запустити сервер
 ```bash
 npm run dev
 ```
 
-База URL за замовчуванням: `http://localhost:8080`
+Сервер за замовчуванням: `http://localhost:8080`
+
+---
+
+## Основні скрипти
+```bash
+npm run dev        # запуск у dev-режимі
+npm run build      # збірка
+npm run start      # запуск зібраної версії
+```
+
+---
+
+## Авторизація (ЛР4)
+
+### Реєстрація
+`POST /auth/register`
+```json
+{
+  "username": "testuser",
+  "password": "12345678"
+}
+```
+
+### Логін
+`POST /auth/login`
+```json
+{
+  "username": "testuser",
+  "password": "12345678"
+}
+```
+
+Відповідь:
+```json
+{
+  "access_token": "<JWT_TOKEN>"
+}
+```
+
+### Як викликати захищені ендпоінти
+Додай заголовок:
+```
+Authorization: Bearer <JWT_TOKEN>
+```
 
 ---
 
 ## Endpoints
 
-### Health
+### Public
 - `GET /healthcheck`
+- `POST /auth/register`
+- `POST /auth/login`
 
-### Users
-- `POST /user` — створити користувача (автоматично створює `Account`)
-- `GET /users` — список користувачів
-- `GET /user/:user_id` — отримати користувача
-- `DELETE /user/:user_id` — видалити користувача
+### Protected (JWT required)
 
-### Categories
-- `POST /category` — створити категорію
-- `GET /category` — список категорій
-- `DELETE /category?category_id=<uuid>` — видалити категорію (сумісно з ЛР2)
+#### Users
+- `POST /user`
+- `GET /users`
+- `GET /user/:user_id`
+- `DELETE /user/:user_id`
 
-### Records (витрати)
-- `POST /record` — створити витрату (списує кошти з Account)
-- `GET /record/:record_id` — отримати запис
-- `DELETE /record/:record_id` — видалити запис
-- `GET /record?user_id=<uuid>&category_id=<uuid>`
-  - потрібно передати **хоча б один** параметр: `user_id` або `category_id`
-  - якщо викликати `GET /record` без параметрів → **400**
+#### Categories
+- `POST /category`
+- `GET /category`
+- `DELETE /category?category_id=<uuid>`
 
-### Account (додаткове завдання)
+#### Records (витрати)
+- `POST /record`  
+  Створює запис витрати та **списує кошти з Account**.
+- `GET /record/:record_id`
+- `DELETE /record/:record_id`
+- `GET /record?user_id=<uuid>&category_id=<uuid>`  
+  Треба передати хоча б один параметр: `user_id` або `category_id`.  
+  Якщо без параметрів → 400.
+
+#### Account (облік доходів)
 - `GET /account/:user_id` — поточний баланс
-- `POST /account/topup` — поповнення
-  - body: `{ "user_id": "<uuid>", "amount": 100 }`
+- `POST /account/topup`
+```json
+{
+  "user_id": "<uuid>",
+  "amount": 1000
+}
+```
 
 ---
 
 ## Postman
-Імпорт:
-- `postman/Lab3.collection.json`
-- `postman/Lab3.local.environment.json`
-- `postman/Lab3.prod.environment.json`
 
-Використані змінні:
+### Імпорт
+- ЛР2:
+  - `postman/Lab2.collection.json`
+  - `postman/Lab2.local.environment.json`
+  - `postman/Lab2.prod.environment.json`
+- ЛР4:
+  - `postman/Lab4.collection.json`
+  - `postman/Lab4.local.environment.json`
+  - `postman/Lab4.prod.environment.json`
+
+### Змінні environment
 - `{{baseUrl}}`
-- `{{userId}}`
-- `{{categoryId}}`
-- `{{recordId}}`
+- `{{username}}`, `{{password}}`
+- `{{accessToken}}` (заповнюється після login)
+- `{{userId}}`, `{{categoryId}}`, `{{recordId}}`, `{{balance}}`
 
 ---
 
-## Скріншот Postman Flow
-Додай скріншот сюди:
+## Структура проєкту (скорочено)
+```text
+src/
+  app.ts
+  main.ts
+  db/
+  middleware/
+    auth.ts
+    validate.ts
+    errorHandler.ts
+  routes/
+    auth.ts
+    users.ts
+    categories.ts
+    records.ts
+    accounts.ts
+  validation/
+prisma/
+  schema.prisma
+postman/
+assets/
+  lab2.png
+  lab4.png
+```
 
-![Postman Flow](assets/lab2.png)
+---
+
+## Postman Flow screenshots
+
+### Lab 2 — Flow
+![Postman Flow — Lab 2](assets/lab2.png)
+
+### Lab 4 — Auth Flow
+![Postman Flow — Lab 4](assets/lab4.png)
