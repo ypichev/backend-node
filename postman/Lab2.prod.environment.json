@@ -4,7 +4,7 @@
   "values": [
     {
       "key": "baseUrl",
-      "value": "https://YOUR-RENDER-URL.onrender.com",
+      "value": "https://https://backend-node-b8tx.onrender.com/",
       "type": "default",
       "enabled": true
     },

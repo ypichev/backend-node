@@ -6,6 +6,14 @@ type JwtPayload = { userId: string };
 
 export const requireAuth: RequestHandler = (req, _res, next) => {
   try {
+    if (
+      req.path === "/healthcheck" ||
+      req.path === "/auth/register" ||
+      req.path === "/auth/login"
+    ) {
+      return next();
+    }
+
     const header = req.header("authorization") || req.header("Authorization");
     if (!header || !header.startsWith("Bearer ")) {
       throw new HttpError(401, "Request does not contain an access token.", {

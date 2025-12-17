@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import jwt, { type Secret, type SignOptions } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { z } from "zod";
 
 import { prisma } from "../db/prisma";
@@ -31,20 +31,12 @@ authRouter.post(
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = await prisma.$transaction(async (tx: any) => {
-      const created = await tx.user.create({
-        data: {
-          username,
-          passwordHash,
-        },
-      });
-
-
-      if (tx.account?.create) {
-        await tx.account.create({ data: { userId: created.id, balance: 0 } });
-      }
-
-      return created;
+    const user = await prisma.user.create({
+      data: {
+        username,
+        passwordHash,
+        account: { create: { balance: 0 } },
+      },
     });
 
     return res.status(201).json({ id: user.id, username: user.username });
@@ -63,15 +55,11 @@ authRouter.post(
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new HttpError(401, "Invalid credentials");
 
-    const secretEnv = process.env.JWT_SECRET_KEY;
-    if (!secretEnv) throw new HttpError(500, "JWT secret is not configured");
+    const secret = process.env.JWT_SECRET_KEY;
+    if (!secret) throw new HttpError(500, "JWT secret is not configured");
 
-    const secret: Secret = secretEnv;
-    const expiresIn = process.env.JWT_EXPIRES_IN ?? "7d";
-
-    const options: SignOptions = { expiresIn: expiresIn as any };
-
-    const access_token = jwt.sign({ userId: user.id }, secret, options);
+    const expiresIn = (process.env.JWT_EXPIRES_IN ?? "7d") as any;
+    const access_token = jwt.sign({ userId: user.id }, secret, { expiresIn });
     return res.json({ access_token });
   })
 );
