@@ -37,12 +37,11 @@ usersRouter.post(
         select: { id: true, username: true, createdAt: true },
       });
 
-      // If Account model exists in your schema, create an account automatically.
-      // This will just be skipped if Account table is not present in Prisma client.
-      // @ts-expect-error optional model in some labs
-      if (tx.account?.create) {
-        // @ts-expect-error optional model in some labs
-        await tx.account.create({ data: { userId: created.id, balance: 0 } });
+      // Optional: if Account model exists in your Prisma schema (Lab 3 group 36),
+      // create an initial account. We keep this safe for builds where Account isn't present.
+      const anyTx = tx as any;
+      if (anyTx.account?.create) {
+        await anyTx.account.create({ data: { userId: created.id, balance: 0 } });
       }
 
       return created;
@@ -83,7 +82,6 @@ usersRouter.delete(
   asyncHandler(async (req, res) => {
     const userId = req.params.user_id;
 
-    // Delete user (may fail if you have FK constraints without cascade).
     await prisma.user.delete({ where: { id: userId } });
 
     return res.status(204).send();
