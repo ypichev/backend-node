@@ -69,7 +69,7 @@ authRouter.post(
     const secret: Secret = secretEnv;
     const expiresIn = process.env.JWT_EXPIRES_IN ?? "7d";
 
-    const options: SignOptions = { expiresIn };
+    const options: SignOptions = { expiresIn: expiresIn as any };
 
     const access_token = jwt.sign({ userId: user.id }, secret, options);
     return res.json({ access_token });

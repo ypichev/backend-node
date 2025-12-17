@@ -1,5 +1,5 @@
 import type { ErrorRequestHandler } from "express";
-import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { HttpError } from "../errors/httpError";
 import { isZodError } from "./validate";
 
@@ -9,10 +9,13 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   }
 
   if (err instanceof HttpError) {
-    return res.status(err.status).json({ message: err.message, details: err.details });
+    return res.status(err.status).json({
+      message: err.message,
+      ...(err.details ? { details: err.details } : {}),
+    });
   }
 
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+  if (err instanceof PrismaClientKnownRequestError) {
     if (err.code === "P2002") {
       return res.status(409).json({ message: "Conflict", details: err.meta });
     }
