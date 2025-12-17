@@ -1,33 +1,65 @@
 import { Router } from "express";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
+
 import { prisma } from "../db/prisma";
 import { HttpError } from "../errors/httpError";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { validateBody } from "../middleware/validate";
-import { CreateUserSchema } from "../validation/schemas";
 
 export const usersRouter = Router();
+
+/**
+ * NOTE:
+ * In Lab 4 you normally create users via /auth/register.
+ * This /user endpoint is kept for backwards compatibility with Lab 2.
+ */
+
+const CreateUserSchema = z.object({
+  username: z.string().min(3).max(50),
+  password: z.string().min(6).max(100),
+});
 
 usersRouter.post(
   "/user",
   validateBody(CreateUserSchema),
   asyncHandler(async (req, res) => {
-    const { name } = req.body as { name: string };
+    const { username, password } = req.body as { username: string; password: string };
 
-    const user = await prisma.$transaction(async (tx: any) => {
-      const created = await tx.user.create({ data: { name } });
-      await tx.account.create({ data: { userId: created.id, balance: 0 } });
+    const existing = await prisma.user.findUnique({ where: { username } });
+    if (existing) throw new HttpError(409, "Conflict", { reason: "username_taken" });
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: { username, passwordHash },
+        select: { id: true, username: true, createdAt: true },
+      });
+
+      // If Account model exists in your schema, create an account automatically.
+      // This will just be skipped if Account table is not present in Prisma client.
+      // @ts-expect-error optional model in some labs
+      if (tx.account?.create) {
+        // @ts-expect-error optional model in some labs
+        await tx.account.create({ data: { userId: created.id, balance: 0 } });
+      }
+
       return created;
     });
 
-    return res.status(201).json({ id: user.id, name: user.name });
+    return res.status(201).json(user);
   })
 );
 
 usersRouter.get(
   "/users",
   asyncHandler(async (_req, res) => {
-    const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
-    return res.json(users.map((u: any) => ({ id: u.id, name: u.name })));
+    const users = await prisma.user.findMany({
+      select: { id: true, username: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return res.json(users);
   })
 );
 
@@ -36,10 +68,13 @@ usersRouter.get(
   asyncHandler(async (req, res) => {
     const userId = req.params.user_id;
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new HttpError(404, "User not found");
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, username: true, createdAt: true },
+    });
 
-    return res.json({ id: user.id, name: user.name });
+    if (!user) throw new HttpError(404, "User not found");
+    return res.json(user);
   })
 );
 
@@ -48,11 +83,9 @@ usersRouter.delete(
   asyncHandler(async (req, res) => {
     const userId = req.params.user_id;
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new HttpError(404, "User not found");
-
+    // Delete user (may fail if you have FK constraints without cascade).
     await prisma.user.delete({ where: { id: userId } });
 
-    return res.json({ message: "User deleted" });
+    return res.status(204).send();
   })
 );
